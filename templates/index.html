@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Handwritten Digital Recognition</title>
+    <link rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/4.1.0/css/bootstrap.min.css">
+    <script src="https://cdn.staticfile.org/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://cdn.staticfile.org/popper.js/1.12.5/umd/popper.min.js"></script>
+    <script src="https://cdn.staticfile.org/twitter-bootstrap/4.1.0/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/camanjs/4.0.0/caman.full.min.js"></script>
+</head>
+<body style="overflow:hidden">
+<div class="card bg-dark text-white" id="head">
+    <div class="card-body text-center">
+        <h5>
+            Simple Flower Recognition
+        </h5>
+    </div>
+</div>
+<div class="card bg-secondary text-white" id="after-head">
+    <div class="card-body">
+        <h5 id="result">
+            It is none.
+        </h5>
+    </div>
+</div>
+<canvas id="drawing-board"></canvas>
+<div class="container-fluid" id="bottom-button">
+    <div class="row">
+        <button type="button" class="btn btn-dark btn-lg col-6" id="upload">upload</button>
+        <button type="button" class="btn btn-dark btn-lg col-6" id="query">query</button>
+    </div>
+</div>
+<input type="file" accept="image/*" id="Uploader" onchange="showImage(this)" style="display: none">
+<canvas id="temp-canvas" style="display: none"></canvas>
+<canvas id="temp-canvas2" style="display: none"></canvas>
+<script type="text/javascript">
+    let canvas = document.getElementById("drawing-board");
+    let ctx = canvas.getContext("2d");
+
+    let tempCanvas = document.getElementById("temp-canvas");
+    let tempCtx = tempCanvas.getContext("2d");
+
+    let tempCanvas2 = document.getElementById("temp-canvas2");
+    let tempCtx2 = tempCanvas2.getContext("2d");
+
+    canvas.width = document.documentElement.clientWidth;
+    canvas.height = document.documentElement.clientHeight;
+    canvas.height -= document.getElementById("head").offsetHeight;
+    canvas.height -= document.getElementById("after-head").offsetHeight;
+    canvas.height -= document.getElementById("bottom-button").offsetHeight + 7;
+    tempCanvas.width = document.documentElement.clientWidth;
+    tempCanvas.height = document.documentElement.clientHeight;
+    tempCanvas.height -= document.getElementById("head").offsetHeight;
+    tempCanvas.height -= document.getElementById("after-head").offsetHeight;
+    tempCanvas.height -= document.getElementById("bottom-button").offsetHeight + 7;
+
+    let cvsWid = canvas.width;
+    let cvsWidMid = cvsWid / 2;
+    let cvsHei = canvas.height;
+    let cvsHeiMid = cvsHei / 2;
+
+    let xMin, xMax, yMin, yMax;
+
+    document.getElementById("upload").addEventListener("click", uploadImage);
+    document.getElementById("query").addEventListener("click", queryImage);
+
+    canvas.addEventListener('mousedown', down, false);
+    canvas.addEventListener('mousemove', move, false);
+    canvas.addEventListener('mouseup', up, false);
+    canvas.addEventListener('mouseout', up, false);
+
+    canvas.addEventListener('touchstart', down, false);
+    canvas.addEventListener('touchmove', move, false);
+    canvas.addEventListener('touchend', up, false);
+    canvas.addEventListener('touchcancel', up, false);
+
+    let touchPoint;
+    let xState = 0, yState = 0;
+
+    function restore() {
+        ctx.clearRect(0,0,cvsWid,cvsHei);
+        let imgData = tempCtx.getImageData(0,0,cvsWid,cvsHei);
+        ctx.putImageData(imgData,0,0);
+    }
+
+    function down(evt) {
+        const {x, y} = getPos(evt);
+        touchPoint = {x, y};
+        if (xMin - 10 <= x && x <= xMin + 10) xState = 1;
+        else if (xMax - 10 <= x && x <= xMax + 10) xState = 2;
+        else xState = 0;
+
+        if (yMin - 10 <= y && y <= yMin + 10) yState = 1;
+        else if (yMax - 10 <= y && y <= yMax + 10) yState = 2;
+        else yState = 0;
+    }
+
+    function move(evt) {
+        if(xState===0&&yState===0) return;
+        const {x, y} = getPos(evt);
+        touchPoint = {x, y};
+        restore();
+        if (xState === 1) {
+            xMin = x;
+            if (xMin > xMax) {
+                [xMin, xMax] = [xMax, xMin];
+                xState = 2;
+            }
+        } else if (xState === 2) {
+            xMax = x;
+            if (xMin > xMax) {
+                [xMin, xMax] = [xMax, xMin];
+                xState = 1;
+            }
+        }
+        if (yState === 1) {
+            yMin = y;
+            if (yMin > yMax) {
+                [yMin, yMax] = [yMax, yMin];
+                yState = 2;
+            }
+        } else if (yState === 2) {
+            yMax = y;
+            if (yMin > yMax) {
+                [yMin, yMax] = [yMax, yMin];
+                yState = 1;
+            }
+        }
+        drawSelector();
+    }
+
+    function up(evt) {
+        if (xState === 0 && yState === 0) return;
+        const {x, y} = getPos(evt);
+        touchPoint = {x, y};
+        restore();
+        if (xState === 1) {
+            xMin = x;
+            if (xMin > xMax) {
+                [xMin, xMax] = [xMax, xMin];
+                xState = 2;
+            }
+        } else if (xState === 2) {
+            xMax = x;
+            if (xMin > xMax) {
+                [xMin, xMax] = [xMax, xMin];
+                xState = 1;
+            }
+        }
+        if (yState === 1) {
+            yMin = y;
+            if (yMin > yMax) {
+                [yMin, yMax] = [yMax, yMin];
+                yState = 2;
+            }
+        } else if (yState === 2) {
+            yMax = y;
+            if (yMin > yMax) {
+                [yMin, yMax] = [yMax, yMin];
+                yState = 1;
+            }
+        }
+        drawSelector();
+        touchPoint = null;
+        xState=0;
+        yState=0;
+    }
+
+    function getPos(evt) {
+        let x = evt.clientX - canvas.offsetLeft;
+        let y = evt.clientY - canvas.offsetTop;
+        if (Number.isNaN(x) || Number.isNaN(y)) {
+            x = evt.touches[0].clientX - canvas.offsetLeft;
+            y = evt.touches[0].clientY - canvas.offsetTop;
+        }
+        console.log("x =", x);
+        console.log("y =", y);
+        return {
+            x: x,
+            y: y
+        }
+    }
+
+    function drawSelector() {
+        ctx.strokeStyle = "#800000";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([20, 20]);
+        ctx.beginPath();
+        ctx.moveTo(xMin, 0);
+        ctx.lineTo(xMin, cvsHei);
+        ctx.stroke();
+        ctx.closePath();
+        ctx.beginPath();
+        ctx.moveTo(xMax, 0);
+        ctx.lineTo(xMax, cvsHei);
+        ctx.stroke();
+        ctx.closePath();
+        ctx.beginPath();
+        ctx.moveTo(0, yMin);
+        ctx.lineTo(cvsWid, yMin);
+        ctx.stroke();
+        ctx.closePath();
+        ctx.beginPath();
+        ctx.moveTo(0, yMax);
+        ctx.lineTo(cvsWid, yMax);
+        ctx.stroke();
+        ctx.closePath();
+        ctx.fillStyle = "rgba(0,0,0,0.2)";
+        ctx.fillRect(0,0,xMin,cvsHei);
+        ctx.fillRect(xMax,0,cvsWid,cvsHei);
+        ctx.fillRect(xMin,0,xMax-xMin,yMin);
+        ctx.fillRect(xMin,yMax,xMax-xMin,cvsHei);
+    }
+
+
+    function uploadImage() {
+        document.getElementById("Uploader").click();
+    }
+
+    function showImage(obj) {
+        ctx.clearRect(0, 0, cvsWid, cvsHei);
+        tempCtx.clearRect(0, 0, cvsWid, cvsHei);
+        tempCtx2.clearRect(0, 0, 299, 299);
+        let file = obj.files[0];
+        let reader = new FileReader();
+        let image = new Image();
+        reader.onload = function (e) {
+            image.src = e.target.result;
+            image.onload = function () {
+                let scale = Math.min(cvsWid / image.width, cvsHei / image.height);
+                let imgWid = image.width * scale;
+                let imgHei = image.height * scale;
+                let x = cvsWidMid - imgWid / 2;
+                let y = cvsHeiMid - imgHei / 2;
+                ctx.drawImage(image, x, y, imgWid, imgHei);
+                tempCtx.drawImage(image, x, y, imgWid, imgHei);
+                xMin = x;
+                xMax = x + imgWid;
+                yMin = y;
+                yMax = y + imgHei;
+                if (xMax - xMin > yMax - yMin) {
+                    xMin = cvsWidMid - (yMax - yMin) / 2;
+                    xMax = cvsWidMid + (yMax - yMin) / 2;
+                } else {
+                    yMin = cvsHeiMid - (xMax - xMin) / 2;
+                    yMax = cvsHeiMid + (xMax - xMin) / 2;
+                }
+                console.log(imgWid,imgHei);
+                console.log(xMin,xMax,yMin,yMax);
+                drawSelector();
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function queryImage() {
+        let rawWidth = xMax - xMin + 1;
+        let rawHeight = yMax - yMin + 1;
+        tempCanvas2.width = rawWidth;
+        tempCanvas2.height = rawHeight;
+        let data = tempCtx.getImageData(xMin, yMin, rawWidth, rawHeight);
+        tempCtx2.putImageData(data, 0, 0);
+        let b64 = tempCanvas2.toDataURL();
+        tempCanvas2.width = 299;
+        tempCanvas2.height = 299;
+        let image = new Image();
+        image.onload = function () {
+            tempCtx2.drawImage(image, 0, 0, 299, 299);
+            b64 = tempCanvas2.toDataURL();
+            console.log(b64);
+            let info = {"b64": b64};
+            $.ajax({
+                type: "post",
+                url: "/",
+                data: info,
+                cache: false,
+                success: function (res) {
+                    res = JSON.parse(res);
+                    document.getElementById("result").innerText = "It is " + res + ".";
+                },
+                error: function () {
+                    alert("error!");
+                }
+            });
+        };
+        image.src = b64;
+    }
+</script>
+</body>
+</html>
